@@ -1,0 +1,54 @@
+{
+	"info": {
+		"_postman_id": "7235287a-8f8b-4b89-8f79-487bcdbcd0ac",
+		"name": "Order Management System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "44863245"
+	},
+	"item": [
+		{
+			"name": "Post order",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"customer\": {\r\n    \"name\": \"Karan\",\r\n    \"email\": \"karan@gmail.com\",\r\n    \"phone\": \"0.123456789\"\r\n  },\r\n  \"items\": [\r\n    { \"sku\": \"ABC123\", \"name\": \"Widget\", \"qty\": 10, \"price\": 100 },\r\n    { \"sku\": \"XYZ789\", \"name\": \"Gadget\", \"qty\": 5, \"price\": 50 }\r\n  ],\r\n  \"shipping\": {\r\n    \"method\": \"express\",\r\n    \"tracking\": \"XYZ123456\",\r\n    \"address\": \"123 Industrial Park, NY\"\r\n  }\r\n//   \"extra\": {\r\n//     \"notes\": \"Deliver between 9 AM - 5 PM\",\r\n//     \"giftWrap\": true\r\n//   }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/orders",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"orders"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "getorderbyid",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		}
+	]
+}
