@@ -8,7 +8,7 @@ const {
 router = express.Router();
 
 router.post("/", createOrder);
-router.post("/search", orderSearch);
+router.get("/search", orderSearch);
 router.get("/report", getReport);
 router.get("/:id", getOrderById);
 

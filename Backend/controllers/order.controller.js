@@ -74,16 +74,17 @@ exports.getOrderById = async (req, res) => {
 
 exports.orderSearch = async (req, res) => {
   try {
-    const { input, page = 1, size = 10 } = req.body;
+    const { text = "", page = 1, size = 10 } = req.query;
+
     let status = null;
-    const textLower = input?.trim().toLowerCase() || "";
+    const textLower = text?.trim().toLowerCase() || "";
 
     const validStatuses = ["pending", "processing", "completed", "failed"];
     if (validStatuses.includes(textLower)) {
       status = textLower;
     }
     const results = await searchOrders(
-      { text: input, status },
+      { text, status },
       (page - 1) * size,
       Number(size)
     );

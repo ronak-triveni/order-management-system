@@ -5,9 +5,13 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-export const createOrder = (payload) => api.post('/orders', payload);
+export const createOrder = (payload) => api.post("/orders", payload);
 export const getOrderById = (id) => api.get(`/orders/${id}`);
-export const searchOrders = (body) => api.post('/orders/search', body);
-export const getReport = () => api.get('/orders/report');
+export const searchOrders = ({ input, page = 1, size = 10 }) =>
+  api.get("/orders/search", {
+    params: { text: input, page, size },
+  });
+
+export const getReport = () => api.get("/orders/report");
 
 export default api;
