@@ -3,7 +3,7 @@ const { Customer, Order } = db;
 const { publishToQueue } = require("../services/rabbitmq");
 const { indexOrder, searchOrders } = require("../services/esService");
 const redis = require("../services/redisClient");
-const { where } = require("sequelize");
+const { sequelize } = require("../models");
 
 exports.createOrder = async (req, res) => {
   try {
@@ -75,8 +75,15 @@ exports.getOrderById = async (req, res) => {
 exports.orderSearch = async (req, res) => {
   try {
     const { input, page = 1, size = 10 } = req.body;
+    let status = null;
+    const textLower = input?.trim().toLowerCase() || "";
+
+    const validStatuses = ["pending", "processing", "completed", "failed"];
+    if (validStatuses.includes(textLower)) {
+      status = textLower;
+    }
     const results = await searchOrders(
-      { text: input},
+      { text: input, status },
       (page - 1) * size,
       Number(size)
     );
@@ -87,4 +94,103 @@ exports.orderSearch = async (req, res) => {
   }
 };
 
-exports.generateReport = (req, res) => {};
+exports.getReport = async (req, res) => {
+  try {
+    const query = `
+    WITH recent_status AS (
+      SELECT
+          o.id AS orderId,
+          o.customerId,
+          o.status AS currentStatus,
+          log.step,
+          log.status AS stepStatus,
+          log.logMessage,
+          log.createdAt AS transitionTime,
+
+          /* Shipping fields */
+          JSON_UNQUOTE(JSON_EXTRACT(o.orderDetails, '$.shipping.method')) AS shippingMethod,
+          JSON_UNQUOTE(JSON_EXTRACT(o.orderDetails, '$.shipping.address')) AS shippingAddress,
+          JSON_UNQUOTE(JSON_EXTRACT(o.orderDetails, '$.shipping.tracking')) AS trackingId,
+
+          /* Items extracted with JSON_TABLE */
+          jt.qty,
+          jt.sku,
+          jt.name,
+          jt.price
+
+      FROM Orders o
+      JOIN OrderProcessingLogs log ON log.orderId = o.id
+
+      JOIN JSON_TABLE(
+        o.orderDetails,
+        '$.items[*]'
+        COLUMNS (
+          qty INT PATH '$.qty',
+          sku VARCHAR(50) PATH '$.sku',
+          name VARCHAR(100) PATH '$.name',
+          price DECIMAL(10,2) PATH '$.price'
+        )
+      ) AS jt
+
+      WHERE o.createdAt >= NOW() - INTERVAL 7 DAY
+    ),
+
+    status_count AS (
+      SELECT
+          o.status,
+          COUNT(*) AS totalOrders
+      FROM Orders o
+      GROUP BY o.status
+    )
+
+    /* FINAL OUTPUT */
+    SELECT
+      /* Transitions with items merged */
+      (
+        SELECT JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'orderId', rs.orderId,
+            'customerId', rs.customerId,
+            'currentStatus', rs.currentStatus,
+            'step', rs.step,
+            'stepStatus', rs.stepStatus,
+            'logMessage', rs.logMessage,
+            'transitionTime', rs.transitionTime,
+            'item', JSON_OBJECT(
+              'qty', rs.qty,
+              'sku', rs.sku,
+              'name', rs.name,
+              'price', rs.price
+            ),
+            'shippingMethod', rs.shippingMethod,
+            'shippingAddress', rs.shippingAddress,
+            'trackingId', rs.trackingId
+          )
+        )
+        FROM recent_status rs
+      ) AS recentTransitions,
+
+      /* Status Count */
+      (
+        SELECT JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'status', sc.status,
+            'totalOrders', sc.totalOrders
+          )
+        )
+        FROM status_count sc
+      ) AS statusCounts;
+    `;
+
+    const [rows] = await sequelize.query(query);
+
+    res.json({
+      success: true,
+      recentTransitions: rows[0].recentTransitions || [],
+      statusCounts: rows[0].statusCounts || [],
+    });
+  } catch (error) {
+    console.error("Error while generating report!", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};

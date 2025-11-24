@@ -60,66 +60,48 @@ async function indexOrder(order, customer) {
   }
 }
 
-// async function searchOrders(query, from = 0, size = 10) {
-//   const esQuery = {
-//     index: INDEX,
-//     from,
-//     size,
-//     body: {
-//       bool: {
-//         must: [
-//           ...(query.text
-//             ? [
-//                 {
-//                   multi_match: {
-//                     query: query.text,
-//                     fields: ["customerName^2", "items.name", "orderId"],
-//                   },
-//                 },
-//               ]
-//             : []),
-//           ...(query.status ? [{ term: { status: query.status } }] : []),
-//         ],
-//       },
-//     },
-//   };
-//   const result = await esClient.search(esQuery);
-//   return result.hits.hits.map((h) => h._source);
-// }
-
 async function searchOrders(query, from = 0, size = 10) {
-  let mustClauses = [];
+  const must = [];
+  const should = [];
 
-  if (query.text) {
-    mustClauses.push({
-      multi_match: {
-        query: query.text,
-        fields: ["customerName^2", "items.name", "orderId"],
+  const text = query.text && String(query.text).trim();
+  if (text && !query.status) {
+    should.push({
+      match: { customerName: { query: text, fuzziness: "AUTO" } },
+    });
+
+    should.push({
+      nested: {
+        path: "items",
+        query: { match: { "items.name": { query: text, fuzziness: "AUTO" } } },
       },
     });
+
+    if (/^\d+$/.test(text)) {
+      should.push({ term: { orderId: Number(text) } });
+    }
   }
 
   if (query.status) {
-    mustClauses.push({
-      term: { status: query.status.toLowerCase() },
-    });
+    must.push({ term: { status: query.status } });
+  }
+
+  const body = { query: { bool: {} } };
+  if (must.length) body.query.bool.must = must;
+  if (should.length && !query.status) {
+    body.query.bool.should = should;
+    body.query.bool.minimum_should_match = 1;
   }
 
   const esQuery = {
     index: INDEX,
     from,
     size,
-    body: {
-      query: {
-        bool: {
-          must: mustClauses,
-        },
-      },
-    },
+    body,
   };
 
   const result = await esClient.search(esQuery);
-  return result.hits.hits.map((h) => h._source);
+  return result.hits.hits;
 }
 
 module.exports = { indexOrder, searchOrders, ensureIndex };

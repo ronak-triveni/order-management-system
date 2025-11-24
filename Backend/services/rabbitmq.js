@@ -17,20 +17,21 @@ async function connectRabbit() {
 
 async function publishToQueue(queueName, payload) {
   const channel = await connectRabbit();
-  console.log("RabbitMQ channel ready");
+  const EXCHANGE = "order_exchange";
+  const ROUTING_KEY = "order.created";
 
+  await channel.assertExchange(EXCHANGE, "topic", { durable: true });
   await channel.assertQueue(queueName, { durable: true });
-  console.log("Queue asserted:", queueName);
+  await channel.bindQueue(queueName, EXCHANGE, "order.*");
 
-  const sent = channel.sendToQueue(
-    queueName,
+  const sent = channel.publish(
+    EXCHANGE,
+    ROUTING_KEY,
     Buffer.from(JSON.stringify(payload)),
-    {
-      persistent: true,
-    }
+    { persistent: true }
   );
 
-  console.log("Message sent?", sent);
+  console.log("Published to exchange?", sent);
 }
 
 module.exports = { connectRabbit, publishToQueue };

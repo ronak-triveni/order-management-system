@@ -1,13 +1,32 @@
-import { Link } from "react-router-dom";
+import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import { Link as RouterLink } from "react-router-dom";
 
 export default function Navbar() {
   return (
-    <nav style={{ padding: 20, gap: 20, display: "flex" }}>
-      <Link to="/orders">Orders</Link>
-      <Link to="/order/create">Create Order</Link>
-      <Link to="/customers">Customers</Link>
-      <Link to="/products">Products</Link>
-      <Link to="/search">Search</Link>
-    </nav>
+    <Box sx={{ flexGrow: 1 }}>
+      <AppBar position="sticky" color="success" elevation={2}>
+        <Toolbar sx={{ gap: 2 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Order Management System
+          </Typography>
+          <Button color="inherit" component={RouterLink} to="/orders">
+            View Orders
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/order/create">
+            Create Order
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/search">
+            Search Order
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/Report">
+            View Report
+          </Button>
+        </Toolbar>
+      </AppBar>
+    </Box>
   );
 }

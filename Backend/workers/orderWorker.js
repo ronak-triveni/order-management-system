@@ -1,4 +1,5 @@
 require("dotenv").config({ path: __dirname + "/../.env" });
+const { indexOrder } = require("../services/esService");
 const amqp = require("amqplib");
 const db = require("../models");
 const { Order, OrderProcessingLog } = db;
@@ -71,6 +72,11 @@ async function orderWorker() {
 
         await Order.update({ status: "completed" }, { where: { id: orderId } });
 
+        const updatedOrder = await Order.findByPk(orderId);
+        const customer = await db.Customer.findByPk(updatedOrder.customerId);
+
+        await indexOrder(updatedOrder, customer);
+
         channel.ack(msg);
       } catch (error) {
         console.error("Worker error:", error);
@@ -81,6 +87,12 @@ async function orderWorker() {
           status: "error",
           logMessage: error.message || "unknown",
         });
+
+        await Order.update({ status: "failed" }, { where: { id: orderId } });
+
+        const updatedOrder = await Order.findByPk(orderId);
+        const customer = await db.Customer.findByPk(updatedOrder.customerId);
+        await indexOrder(updatedOrder, customer);
 
         channel.ack(msg);
       }

@@ -4,6 +4,13 @@ module.exports = (sequelize, DataTypes) => {
     "OrderProcessingLog",
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+      orderId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: { model: "Orders", key: "id" },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
+      },
       step: DataTypes.STRING,
       status: DataTypes.STRING,
       logMessage: DataTypes.TEXT,
