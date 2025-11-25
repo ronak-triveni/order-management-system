@@ -3,6 +3,7 @@ const REDIS_URL = process.env.REDIS_URL;
 
 const client = redis.createClient({
   url: REDIS_URL,
+  legacyMode: false,
 });
 
 client.on("error", (err) => console.error("Redis Error", err));

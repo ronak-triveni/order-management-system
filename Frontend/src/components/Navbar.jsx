@@ -13,17 +13,20 @@ export default function Navbar() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Order Management System
           </Typography>
-          <Button color="inherit" component={RouterLink} to="/orders">
-            View Orders
-          </Button>
           <Button color="inherit" component={RouterLink} to="/order/create">
             Create Order
           </Button>
-          <Button color="inherit" component={RouterLink} to="/search">
-            Search Order
+          <Button color="inherit" component={RouterLink} to="ag-grid">
+            Order List
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/orders">
+            View Orders
           </Button>
           <Button color="inherit" component={RouterLink} to="/Report">
             View Report
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/search">
+            Search Order
           </Button>
         </Toolbar>
       </AppBar>

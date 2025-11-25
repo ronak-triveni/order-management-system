@@ -4,6 +4,12 @@ module.exports = (sequelize, DataTypes) => {
     "Order",
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+      customerId: {
+        type: DataTypes.INTEGER,
+        references: { model: "Customer", key: "id" },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL",
+      },
       status: DataTypes.ENUM("pending", "processing", "completed", "failed"),
       orderDetails: DataTypes.JSON,
     },

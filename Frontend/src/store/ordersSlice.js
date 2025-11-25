@@ -12,9 +12,15 @@ export const createOrder = createAsyncThunk(
 export const fetchOrderById = createAsyncThunk(
   "orders/fetchById",
   async (id, thunkAPI) => {
-    const res = await api.getOrderById(id);
-    console.log(res);
-    return res.data;
+    try {
+      const res = await api.getOrderById(id);
+      console.log(res.data);
+      return res.data;
+    } catch (error) {}
+    if (error.res) {
+      return thunkAPI.rejectWithValue(error.res.data);
+    }
+    return thunkAPI.rejectWithValue({ error: "Network error" });
   }
 );
 
@@ -27,6 +33,15 @@ export const searchOrders = createAsyncThunk(
   }
 );
 
+export const fetchOrdersGrid = createAsyncThunk(
+  "orders/fetchGrid",
+  async (params) => {
+    const res = await api.fetchOrdersForGrid(params);
+    console.log("grid response:", res.data);
+    return res.data;
+  }
+);
+
 const ordersSlice = createSlice({
   name: "orders",
   initialState: {
@@ -34,6 +49,9 @@ const ordersSlice = createSlice({
     createResult: null,
     currentOrder: null,
     searchResults: null,
+    gridData: null,
+    loadingGrid: false,
+    gridError: null,
     loading: false,
     error: null,
   },
@@ -67,7 +85,7 @@ const ordersSlice = createSlice({
       })
       .addCase(fetchOrderById.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error;
+        state.error = action.payload?.error;
       })
 
       .addCase(searchOrders.pending, (state) => {
@@ -81,6 +99,18 @@ const ordersSlice = createSlice({
       .addCase(searchOrders.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error;
+      })
+
+      .addCase(fetchOrdersGrid.pending, (state) => {
+        state.loadingGrid = true;
+      })
+      .addCase(fetchOrdersGrid.fulfilled, (state, action) => {
+        state.loadingGrid = false;
+        state.gridData = action.payload;
+      })
+      .addCase(fetchOrdersGrid.rejected, (state, action) => {
+        state.loadingGrid = false;
+        state.gridError = action.error;
       });
   },
 });

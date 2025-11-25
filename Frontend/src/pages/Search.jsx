@@ -26,7 +26,7 @@ export default function Search() {
       <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
         <TextField
           fullWidth
-          label="Search"
+          label="Search by customer name, orderId, item name or status"
           value={input}
           onChange={(e) => setInput(e.target.value)}
         />

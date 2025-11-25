@@ -1,0 +1,143 @@
+DELIMITER $$
+
+CREATE PROCEDURE GetOrders(
+    IN p_offset INT,
+    IN p_limit INT,
+    IN p_sortBy VARCHAR(255),
+    IN p_sortDir VARCHAR(4),
+    IN p_statusFilter VARCHAR(50)
+)
+BEGIN
+    SET @sql = CONCAT(
+        'SELECT id, customerId, status, orderDetails, ',
+        'CONVERT_TZ(createdAt, "+00:00", "-06:00") AS createdAtCST, ',
+        'CONVERT_TZ(updatedAt, "+00:00", "-06:00") AS updatedAtCST ',
+        'FROM Orders ',
+        'WHERE 1=1 ',
+        IF(p_statusFilter IS NOT NULL AND p_statusFilter != '', CONCAT('AND status = "', p_statusFilter, '" '), ''),
+        'ORDER BY ', p_sortBy, ' ', p_sortDir, ' ',
+        'LIMIT ', p_offset, ',', p_limit
+    );
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
+
+DELIMITER ;
+
+
+
+
+
+
+--  second
+DELIMITER $$
+
+CREATE PROCEDURE GetOrdersForGrid(
+    IN p_offset INT,
+    IN p_limit INT,
+    IN p_sortBy VARCHAR(255),
+    IN p_sortDir VARCHAR(4),
+    IN p_status VARCHAR(50)
+)
+BEGIN
+    SET @sql = CONCAT(
+        'SELECT id, customerId, status, ',
+        'JSON_UNQUOTE(JSON_EXTRACT(orderDetails, ''$'')) AS orderDetails, ',
+        'CONVERT_TZ(createdAt, "+00:00", "-06:00") AS createdAtCST, ',
+        'CONVERT_TZ(updatedAt, "+00:00", "-06:00") AS updatedAtCST ',
+        'FROM Orders WHERE 1=1 '
+    );
+
+    IF p_status IS NOT NULL AND p_status != '' THEN
+        SET @sql = CONCAT(@sql, ' AND status = "', p_status, '" ');
+    END IF;
+
+    SET @sql = CONCAT(@sql, ' ORDER BY ', p_sortBy, ' ', p_sortDir);
+    SET @sql = CONCAT(@sql, ' LIMIT ', p_offset, ',', p_limit);
+
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
+
+DELIMITER ;
+
+
+
+-- third
+
+DELIMITER $$
+
+CREATE PROCEDURE CountOrdersForGrid(
+    IN p_status VARCHAR(50)
+)
+BEGIN
+    SET @sql = 'SELECT COUNT(*) AS total FROM Orders WHERE 1=1 ';
+
+    IF p_status IS NOT NULL AND p_status != '' THEN
+        SET @sql = CONCAT(@sql, ' AND status = "', p_status, '" ');
+    END IF;
+
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
+
+DELIMITER ;
+ 
+ 
+ --  filter Sp
+ DELIMITER $$
+
+CREATE PROCEDURE GetOrdersForGrid(
+    IN p_offset INT,CountOrdersForGridGetOrdersForGridCountOrdersForGrid
+    IN p_limit INT,
+    IN p_sortBy VARCHAR(255),
+    IN p_sortDir VARCHAR(4),
+
+    IN p_status VARCHAR(50),
+    IN p_customerId VARCHAR(50),
+    IN p_shippingMethod VARCHAR(255),
+    IN p_createdFrom VARCHAR(50),
+    IN p_createdTo VARCHAR(50)
+)
+BEGIN
+    SET @sql = CONCAT(
+        'SELECT id, customerId, status,
+         JSON_UNQUOTE(JSON_EXTRACT(orderDetails, ''$'')) AS orderDetails,
+         CONVERT_TZ(createdAt, "+00:00", "-06:00") AS createdAtCST,
+         CONVERT_TZ(updatedAt, "+00:00", "-06:00") AS updatedAtCST
+         FROM Orders WHERE 1=1 '
+    );
+
+    IF p_status != '' THEN
+        SET @sql = CONCAT(@sql, ' AND status = "', p_status, '" ');
+    END IF;
+
+    IF p_customerId != '' THEN
+        SET @sql = CONCAT(@sql, ' AND customerId = "', p_customerId, '" ');
+    END IF;
+
+    IF p_shippingMethod != '' THEN
+        SET @sql = CONCAT(@sql, ' AND JSON_EXTRACT(orderDetails, ''$.shipping.method'') LIKE "%', p_shippingMethod, '%" ');
+    END IF;
+
+    IF p_createdFrom != '' THEN
+        SET @sql = CONCAT(@sql, ' AND createdAt >= "', p_createdFrom, '" ');
+    END IF;
+
+    IF p_createdTo != '' THEN
+        SET @sql = CONCAT(@sql, ' AND createdAt <= "', p_createdTo, '" ');
+    END IF;
+
+    SET @sql = CONCAT(@sql, ' ORDER BY ', p_sortBy, ' ', p_sortDir);
+    SET @sql = CONCAT(@sql, ' LIMIT ', p_offset, ',', p_limit);
+
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END $$
+
+DELIMITER ;
+

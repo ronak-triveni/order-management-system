@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../store/ordersSlice";
+import { useForm, Controller } from "react-hook-form";
 import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
@@ -9,26 +10,57 @@ import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 
 export default function Orders() {
-  const [id, setId] = useState("");
   const dispatch = useDispatch();
   const { currentOrder, loading } = useSelector((s) => s.orders);
 
-  const handleFetch = () => {
-    if (!id) return;
-    dispatch(fetchOrderById(id));
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    defaultValues: { orderId: "" },
+  });
+
+  const onSubmit = (data) => {
+    dispatch(fetchOrderById(data.orderId));
   };
 
   return (
     <Paper sx={{ p: 3 }} elevation={2}>
       <Typography variant="h5">Fetch Order</Typography>
 
-      <Box sx={{ display: "flex", gap: 2, alignItems: "center", mt: 2 }}>
-        <TextField
-          label="Order ID"
-          value={id}
-          onChange={(e) => setId(e.target.value)}
+      <Box
+        component="form"
+        onSubmit={handleSubmit(onSubmit)}
+        sx={{ display: "flex", gap: 2, alignItems: "center", mt: 2 }}
+      >
+        <Controller
+          name="orderId"
+          control={control}
+          rules={{
+            required: "Order ID is required",
+            pattern: {
+              value: /^[0-9\-]+$/,
+              message: "Order ID can contain only numbers",
+            },
+          }}
+          render={({ field }) => (
+            <TextField
+              type="number"
+              label="Order ID"
+              {...field}
+              error={!!errors.orderId}
+              helperText={errors.orderId?.message}
+            />
+          )}
         />
-        <Button variant="contained" onClick={handleFetch} disabled={loading} color="success">
+
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={loading}
+          color="success"
+        >
           {loading ? "Loading..." : "Fetch"}
         </Button>
       </Box>
@@ -58,13 +90,9 @@ export default function Orders() {
 
               <tbody>
                 <tr>
-                  <td style={{ padding: 8 }}>
-                    {currentOrder.Customer?.name}
-                  </td>
+                  <td style={{ padding: 8 }}>{currentOrder.Customer?.name}</td>
 
-                  <td style={{ padding: 8 }}>
-                    {currentOrder.Customer?.email}
-                  </td>
+                  <td style={{ padding: 8 }}>{currentOrder.Customer?.email}</td>
 
                   <td style={{ padding: 8 }}>
                     {currentOrder.orderDetails?.shipping?.address}

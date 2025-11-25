@@ -4,10 +4,30 @@ const { publishToQueue } = require("../services/rabbitmq");
 const { indexOrder, searchOrders } = require("../services/esService");
 const redis = require("../services/redisClient");
 const { sequelize } = require("../models");
+const { errors } = require("@elastic/elasticsearch");
 
 exports.createOrder = async (req, res) => {
   try {
     const { customer, items, shipping, extra } = req.body;
+
+    if (!customer || typeof customer !== "object")
+      return res.status(400).json({ error: "Customer data is required." });
+
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ error: "Shipping details required!" });
+
+    if (
+      !customer.name ||
+      typeof customer.name !== "string" ||
+      customer.name.length > 20
+    )
+      return res.status(400).json({ error: "Invalid customer name." });
+
+    if (!customer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
+      return res.status(400).json({ error: "Invalid email address." });
+
+    if (!customer.phone || !/^[0-9]{10}$/.test(customer.phone))
+      return res.status(400).json({ error: "Invalid phone number." });
 
     let cust = await Customer.findOne({ where: { email: customer.email } });
 
@@ -44,11 +64,6 @@ exports.getOrderById = async (req, res) => {
   const id = req.params.id;
   const cacheKey = `order:${id}`;
   try {
-    const orderExist = await Order.findByPk(id);
-
-    if (!orderExist) {
-      return res.status(400).json({ message: "Order not found!" });
-    }
     const cached = await redis.get(cacheKey);
 
     if (cached) {
@@ -59,12 +74,14 @@ exports.getOrderById = async (req, res) => {
       where: { id },
       include: [{ model: db.Customer }],
     });
+
+    console.log("order value: ", order);
     if (!order) {
-      return res.json(404).json({ error: "Order Not Found!" });
+      return res.status(404).json({ error: "Order Not Found!" });
     }
     const result = order.toJSON();
 
-    await redis.set(cacheKey, JSON.stringify(result), "EX", 30);
+    await redis.set(cacheKey, JSON.stringify(result), { EX: 30 });
     return res.json({ source: "db", order: result });
   } catch (error) {
     console.error("Error while fetching orders!", error);
@@ -92,6 +109,114 @@ exports.orderSearch = async (req, res) => {
   } catch (error) {
     console.error("Error while searching order!", error);
     res.status(500).json({ message: "Internal Server Error!" });
+  }
+};
+
+exports.getOrdersForGrid = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      size = 20,
+      sortBy = "createdAt",
+      sortDir = "DESC",
+      status = "",
+      filters = "{}",
+    } = req.query;
+
+    const offset = (page - 1) * size;
+    const limit = parseInt(size);
+
+    let filterObj = {};
+
+    try {
+      filterObj = JSON.parse(filters);
+    } catch {}
+
+    let whereFilters = {};
+
+    if (filterObj.status?.filter) {
+      whereFilters.status = filterObj.status.filter;
+    }
+
+    if (filterObj.customerId?.filter) {
+      whereFilters.customerId = filterObj.customerId.filter;
+    }
+
+    if (filterObj.shippingMethod?.filter) {
+      whereFilters.shippingMethod = filterObj.shippingMethod.filter;
+    }
+
+    if (filterObj.createdAtCST?.dateFrom || filterObj.createdAtCST?.dateTo) {
+      whereFilters.createdAtFrom = filterObj.createdAtCST.dateFrom;
+      whereFilters.createdAtTo = filterObj.createdAtCST.dateTo;
+    }
+
+    const raw = await sequelize.query(
+      `CALL GetOrdersForGrid(:offset, :limit, :sortBy, :sortDir, :status, :customerId, :shippingMethod,
+      :createdAtFrom, :createdAtTo)`,
+      {
+        replacements: {
+          offset,
+          limit,
+          sortBy,
+          sortDir,
+          status: whereFilters.status || "",
+          customerId: whereFilters.customerId || "",
+          shippingMethod: whereFilters.shippingMethod || "",
+          createdAtFrom: whereFilters.createdAtFrom || "",
+          createdAtTo: whereFilters.createdAtTo || "",
+        },
+      }
+    );
+
+    const rows = raw;
+
+    const results = rows.map((o) => {
+      let details = {};
+
+      if (typeof o.orderDetails === "string") {
+        try {
+          details = JSON.parse(o.orderDetails);
+        } catch {}
+      } else if (
+        typeof o.orderDetails === "object" &&
+        o.orderDetails !== null
+      ) {
+        details = o.orderDetails;
+      }
+
+      return {
+        id: o.id,
+        customerId: o.customerId,
+        status: o.status,
+        createdAtCST: o.createdAtCST,
+        updatedAtCST: o.updatedAtCST,
+
+        items: details.items || [],
+        itemsCount: details.items ? details.items.length : 0,
+
+        shippingMethod: details.shipping?.method || "",
+        shippingAddress: details.shipping?.address || "",
+        tracking: details.shipping?.tracking || "",
+      };
+    });
+
+    const countResult = await sequelize.query(
+      `CALL CountOrdersForGrid(:status)`,
+      { replacements: { status } }
+    );
+
+    const total = countResult[0]?.total || 0;
+
+    res.json({
+      results,
+      total,
+      page: Number(page),
+      size: limit,
+    });
+  } catch (err) {
+    console.error("Error fetching grid data:", err);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 

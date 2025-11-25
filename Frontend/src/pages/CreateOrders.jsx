@@ -24,7 +24,7 @@ export default function CreateOrders() {
     defaultValues: {
       customer: { name: "", email: "", phone: "" },
 
-      items: [{ sku: "", name: "", qty: 1, price: 0 }],
+      items: [{ sku: "", name: "", qty: 1, price: "" }],
 
       shipping: {
         method: "",
@@ -66,24 +66,69 @@ export default function CreateOrders() {
             <Controller
               name="customer.name"
               control={control}
-              render={({ field }) => (
-                <TextField fullWidth label="Name" margin="normal" {...field} />
+              rules={{
+                required: "Name is required",
+                maxLength: { value: 20, message: "Max 20 characters allowed" },
+                pattern: {
+                  value: /^[A-Za-z\s]+$/,
+                  message: "Name can contain letters only",
+                },
+              }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  fullWidth
+                  label="Name"
+                  margin="normal"
+                  {...field}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
+                />
               )}
             />
 
+            {/* EMAIL */}
             <Controller
               name="customer.email"
               control={control}
-              render={({ field }) => (
-                <TextField fullWidth label="Email" margin="normal" {...field} />
+              rules={{
+                required: "Email is required",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Invalid email format",
+                },
+              }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  fullWidth
+                  label="Email"
+                  margin="normal"
+                  {...field}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
+                />
               )}
             />
 
             <Controller
               name="customer.phone"
               control={control}
-              render={({ field }) => (
-                <TextField fullWidth label="Phone" margin="normal" {...field} />
+              rules={{
+                pattern: {
+                  value: /^[0-9]{10}$/,
+                  message: "Phone must be 10 digits",
+                  maxLength: 10,
+                },
+              }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  type="number"
+                  fullWidth
+                  label="Phone"
+                  margin="normal"
+                  {...field}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
+                />
               )}
             />
           </Grid>
@@ -92,17 +137,22 @@ export default function CreateOrders() {
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle1">Shipping</Typography>
 
-            {/* Shipping Method - Dropdown */}
+            {/* SHIPPING METHOD */}
             <Controller
               name="shipping.method"
               control={control}
-              render={({ field }) => (
+              rules={{
+                required: "Please select shipping method!",
+              }}
+              render={({ field, fieldState }) => (
                 <TextField
                   select
                   fullWidth
                   label="Shipping Method"
                   margin="normal"
                   {...field}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
                 >
                   {["Standard", "Express", "Same-Day"].map((m) => (
                     <MenuItem key={m} value={m}>
@@ -113,16 +163,25 @@ export default function CreateOrders() {
               )}
             />
 
-            {/* Address - normal input (NOT dropdown) */}
+            {/* ADDRESS */}
             <Controller
               name="shipping.address"
               control={control}
-              render={({ field }) => (
+              rules={{
+                required: "Address is required",
+                maxLength: {
+                  value: 50,
+                  message: "Max character length exceed!",
+                },
+              }}
+              render={({ field, fieldState }) => (
                 <TextField
                   fullWidth
                   label="Address"
                   margin="normal"
                   {...field}
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
                 />
               )}
             />
@@ -138,27 +197,34 @@ export default function CreateOrders() {
                   <Controller
                     name={`items.${idx}.sku`}
                     control={control}
-                    render={({ field }) => (
+                    rules={{ required: "SKU required" }}
+                    render={({ field, fieldState }) => (
                       <TextField
                         fullWidth
                         label="SKU"
                         margin="normal"
                         {...field}
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
                       />
                     )}
                   />
                 </Grid>
 
+                {/* ITEM NAME */}
                 <Grid item xs={6} md={3}>
                   <Controller
                     name={`items.${idx}.name`}
                     control={control}
-                    render={({ field }) => (
+                    rules={{ required: "Item name required" }}
+                    render={({ field, fieldState }) => (
                       <TextField
                         fullWidth
                         label="Item Name"
                         margin="normal"
                         {...field}
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
                       />
                     )}
                   />
@@ -168,27 +234,44 @@ export default function CreateOrders() {
                   <Controller
                     name={`items.${idx}.qty`}
                     control={control}
-                    render={({ field }) => (
+                    rules={{
+                      required: "Qty required",
+                      min: { value: 1, message: "Min 1" },
+                    }}
+                    render={({ field, fieldState }) => (
                       <TextField
                         type="number"
                         label="Qty"
                         margin="normal"
                         {...field}
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
                       />
                     )}
                   />
                 </Grid>
 
+                {/* PRICE */}
                 <Grid item xs={6} md={2}>
                   <Controller
                     name={`items.${idx}.price`}
                     control={control}
-                    render={({ field }) => (
+                    rules={{
+                      required: "Price required",
+                      min: { value: 0, message: "Cannot be negative" },
+                      max: {
+                        value: 1000000,
+                        message: "Order value cannot be more than 1000000",
+                      },
+                    }}
+                    render={({ field, fieldState }) => (
                       <TextField
                         type="number"
                         label="Price"
                         margin="normal"
                         {...field}
+                        error={!!fieldState.error}
+                        helperText={fieldState.error?.message}
                       />
                     )}
                   />
