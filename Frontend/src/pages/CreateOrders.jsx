@@ -12,10 +12,16 @@ import IconButton from "@mui/material/IconButton";
 import Box from "@mui/material/Box";
 import DeleteIcon from "@mui/icons-material/Delete";
 import MenuItem from "@mui/material/MenuItem";
+import { toast } from "react-toastify";
 
 export default function CreateOrders() {
   const dispatch = useDispatch();
-  const { creating, createResult } = useSelector((s) => s.orders);
+  const { creating, createResult, error } = useSelector((s) => s.orders);
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   const generateTrackingId = () =>
     "TRK-" + Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -47,8 +53,14 @@ export default function CreateOrders() {
 
   const onSubmit = async (data) => {
     data.shipping.tracking = generateTrackingId();
-    await dispatch(createOrder(data));
-    reset();
+    const result = await dispatch(createOrder(data));
+    if (createOrder.rejected.match(result)) return;
+
+    if (createOrder.fulfilled.match(result)) {
+      toast.success("Order created successfully!");
+      reset();
+      dispatch(clearCreateResult());
+    }
   };
 
   return (
@@ -113,6 +125,7 @@ export default function CreateOrders() {
               name="customer.phone"
               control={control}
               rules={{
+                required: "Phone Number is required",
                 pattern: {
                   value: /^[0-9]{10}$/,
                   message: "Phone must be 10 digits",
@@ -307,12 +320,6 @@ export default function CreateOrders() {
             >
               {creating ? "Creating..." : "Create Order"}
             </Button>
-
-            {createResult && (
-              <Box component="span" sx={{ ml: 2, color: "success.main" }}>
-                Created orderId: {createResult.orderId}
-              </Box>
-            )}
           </Grid>
         </Grid>
       </Box>

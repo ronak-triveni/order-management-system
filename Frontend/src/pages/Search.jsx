@@ -30,7 +30,12 @@ export default function Search() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
         />
-        <Button variant="contained" onClick={doSearch} disabled={loading} color="success">
+        <Button
+          variant="contained"
+          onClick={doSearch}
+          disabled={loading}
+          color="success"
+        >
           {loading ? "Searching..." : "Search"}
         </Button>
       </Box>

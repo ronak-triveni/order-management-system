@@ -7,6 +7,7 @@ import Container from "@mui/material/Container";
 import Box from "@mui/material/Box";
 import GenerateReport from "./pages/GenerateReport";
 import OrdersGrid from "./pages/OrdersGrid";
+import { ToastContainer, toast } from "react-toastify";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           </Routes>
         </Container>
       </Box>
+      <ToastContainer position="top-right" autoClose={1000} />
     </BrowserRouter>
   );
 }

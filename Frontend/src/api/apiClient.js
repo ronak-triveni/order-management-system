@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "react-toastify";
 
 const api = axios.create({
   baseURL: "http://localhost:3000",
@@ -23,5 +24,18 @@ export const fetchOrdersForGrid = ({
   });
 
 export const getReport = () => api.get("/orders/report");
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error.response) {
+      return Promise.reject(error);
+    }
+
+    // toast.error(error.response.data.message || "Something went wrong");
+
+    return Promise.reject(error.response.data);
+  }
+);
 
 export default api;

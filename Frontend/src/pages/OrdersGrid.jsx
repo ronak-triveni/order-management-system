@@ -14,7 +14,12 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 
 export default function OrdersGrid() {
   const dispatch = useDispatch();
-  const { gridData, loadingGrid } = useSelector((state) => state.orders);
+  const { gridData, loading, error } = useSelector((state) => state.orders);
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   const [gridApi, setGridApi] = useState(null);
   const [page, setPage] = useState(1);
@@ -23,7 +28,6 @@ export default function OrdersGrid() {
 
   const formatItems = (items) => {
     if (!items || items.length === 0) return "No items";
-
     return items.map((item) => `${item.name}`);
   };
 
@@ -174,7 +178,7 @@ export default function OrdersGrid() {
         onFilterChanged={onFilterChanged}
       />
 
-      {loadingGrid && (
+      {loading && (
         <div style={{ marginTop: 10, textAlign: "center" }}>Loading...</div>
       )}
     </div>

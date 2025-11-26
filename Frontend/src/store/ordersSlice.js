@@ -1,11 +1,16 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import * as api from "../api/apiClient";
+import { handleApiError } from "../utils/handleApiError";
 
 export const createOrder = createAsyncThunk(
   "orders/createOrder",
   async (payload, thunkAPI) => {
-    const res = await api.createOrder(payload);
-    return res.data;
+    try {
+      const res = await api.createOrder(payload);
+      return res.data;
+    } catch (error) {
+      return handleApiError(error, thunkAPI);
+    }
   }
 );
 
@@ -16,29 +21,35 @@ export const fetchOrderById = createAsyncThunk(
       const res = await api.getOrderById(id);
       console.log(res.data);
       return res.data;
-    } catch (error) {}
-    if (error.res) {
-      return thunkAPI.rejectWithValue(error.res.data);
+    } catch (error) {
+      return handleApiError(error, thunkAPI);
     }
-    return thunkAPI.rejectWithValue({ error: "Network error" });
   }
 );
 
 export const searchOrders = createAsyncThunk(
   "orders/search",
   async ({ input, page = 1, size = 10 }, thunkAPI) => {
-    const res = await api.searchOrders({ input, page, size });
-    console.log(res.data.results[0]);
-    return res.data;
+    try {
+      const res = await api.searchOrders({ input, page, size });
+      console.log(res.data.results[0]);
+      return res.data;
+    } catch (error) {
+      return handleApiError(error, thunkAPI);
+    }
   }
 );
 
 export const fetchOrdersGrid = createAsyncThunk(
   "orders/fetchGrid",
-  async (params) => {
-    const res = await api.fetchOrdersForGrid(params);
-    console.log("grid response:", res.data);
-    return res.data;
+  async (params, thunkAPI) => {
+    try {
+      const res = await api.fetchOrdersForGrid(params);
+      console.log("grid response:", res.data);
+      return res.data;
+    } catch (error) {
+      return handleApiError(error, thunkAPI);
+    }
   }
 );
 
@@ -50,7 +61,6 @@ const ordersSlice = createSlice({
     currentOrder: null,
     searchResults: null,
     gridData: null,
-    loadingGrid: false,
     gridError: null,
     loading: false,
     error: null,
@@ -58,6 +68,15 @@ const ordersSlice = createSlice({
   reducers: {
     clearCreateResult(state) {
       state.createResult = null;
+    },
+    clearCurrentOrder(state) {
+      state.currentOrder = null;
+    },
+    clearSearchResults(state) {
+      state.searchResults = null;
+    },
+    clearError(state) {
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
@@ -72,7 +91,7 @@ const ordersSlice = createSlice({
       })
       .addCase(createOrder.rejected, (state, action) => {
         state.creating = false;
-        state.error = action.error;
+        state.error = action.payload?.error || "Unexpected server error";
       })
 
       .addCase(fetchOrderById.pending, (state) => {
@@ -85,7 +104,7 @@ const ordersSlice = createSlice({
       })
       .addCase(fetchOrderById.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.error;
+        state.error = action.payload?.error || "Unexpected server error";
       })
 
       .addCase(searchOrders.pending, (state) => {
@@ -98,23 +117,29 @@ const ordersSlice = createSlice({
       })
       .addCase(searchOrders.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error;
+        state.error = action.payload?.error || "Unexpected server error";
       })
 
       .addCase(fetchOrdersGrid.pending, (state) => {
-        state.loadingGrid = true;
+        state.loading = true;
+        state.error = null;
       })
       .addCase(fetchOrdersGrid.fulfilled, (state, action) => {
-        state.loadingGrid = false;
+        state.loading = false;
         state.gridData = action.payload;
       })
       .addCase(fetchOrdersGrid.rejected, (state, action) => {
-        state.loadingGrid = false;
-        state.gridError = action.error;
+        state.loading = false;
+        state.error = action.payload?.error || "Unexpected server error";
       });
   },
 });
 
-export const { clearCreateResult } = ordersSlice.actions;
+export const {
+  clearCreateResult,
+  clearCurrentOrder,
+  clearSearchResults,
+  clearError,
+} = ordersSlice.actions;
 
 export default ordersSlice.reducer;

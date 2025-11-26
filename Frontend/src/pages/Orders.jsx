@@ -1,4 +1,4 @@
-import React from "react";
+import { React, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrderById } from "../store/ordersSlice";
 import { useForm, Controller } from "react-hook-form";
@@ -8,10 +8,22 @@ import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
+import { toast } from "react-toastify";
 
 export default function Orders() {
   const dispatch = useDispatch();
-  const { currentOrder, loading } = useSelector((s) => s.orders);
+  const { currentOrder, loading, error } = useSelector((s) => s.orders);
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (currentOrder) {
+      toast.success("Data Fetched Successfully");
+    }
+  });
 
   const {
     control,
@@ -28,7 +40,6 @@ export default function Orders() {
   return (
     <Paper sx={{ p: 3 }} elevation={2}>
       <Typography variant="h5">Fetch Order</Typography>
-
       <Box
         component="form"
         onSubmit={handleSubmit(onSubmit)}
@@ -73,7 +84,6 @@ export default function Orders() {
           <Typography variant="subtitle1" sx={{ mt: 3 }}>
             Customer & Order Info
           </Typography>
-
           <Box sx={{ mt: 1 }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>

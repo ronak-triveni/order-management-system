@@ -5,29 +5,70 @@ const { indexOrder, searchOrders } = require("../services/esService");
 const redis = require("../services/redisClient");
 const { sequelize } = require("../models");
 const { errors } = require("@elastic/elasticsearch");
+const Errorlogs = require("../models/errorlogs.model");
 
 exports.createOrder = async (req, res) => {
   try {
     const { customer, items, shipping, extra } = req.body;
 
-    if (!customer || typeof customer !== "object")
+    if (!customer || typeof customer !== "object") {
+      try {
+        await Errorlogs.create({
+          error: "Customer data is required.",
+        });
+      } catch (error) {
+        console.log("MongoDB error!");
+      }
       return res.status(400).json({ error: "Customer data is required." });
+    }
 
-    if (!Array.isArray(items) || items.length === 0)
-      return res.status(400).json({ error: "Shipping details required!" });
+    if (!Array.isArray(items) || items.length === 0) {
+      try {
+        await Errorlogs.create({
+          error: "Item details are required!",
+        });
+      } catch (error) {
+        console.log("MongoDB error!");
+      }
+      return res.status(400).json({ error: "Item details are required!" });
+    }
 
     if (
       !customer.name ||
       typeof customer.name !== "string" ||
       customer.name.length > 20
-    )
-      return res.status(400).json({ error: "Invalid customer name." });
+    ) {
+      try {
+        await Errorlogs.create({
+          error: "Invalid customer name!",
+        });
+      } catch (error) {
+        console.log("MongoDB error!");
+      }
+      return res.status(400).json({ error: "Invalid customer name!" });
+    }
 
-    if (!customer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email))
-      return res.status(400).json({ error: "Invalid email address." });
+    if (!customer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) {
+      try {
+        await Errorlogs.create({
+          error: "Invalid email address!",
+        });
+      } catch (error) {
+        console.log("MongoDB error!");
+      }
+      return res.status(400).json({ error: "Invalid email address!" });
+    }
 
-    if (!customer.phone || !/^[0-9]{10}$/.test(customer.phone))
-      return res.status(400).json({ error: "Invalid phone number." });
+    if (!customer.phone || !/^[0-9]{10}$/.test(customer.phone)) {
+      try {
+        await Errorlogs.create({
+          error: "Invalid phone number!",
+        });
+      } catch (error) {
+        console.log("MongoDB error!");
+      }
+      return res.status(400).json({ error: "Invalid phone number!" });
+    }
 
     let cust = await Customer.findOne({ where: { email: customer.email } });
 
@@ -77,6 +118,13 @@ exports.getOrderById = async (req, res) => {
 
     console.log("order value: ", order);
     if (!order) {
+      try {
+        await Errorlogs.create({
+          error: "Order Not Found!",
+        });
+      } catch (error) {
+        return res.status(500).json("MongoDB error!");
+      }
       return res.status(404).json({ error: "Order Not Found!" });
     }
     const result = order.toJSON();
