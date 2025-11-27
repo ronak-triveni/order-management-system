@@ -11,7 +11,10 @@ async function connectRabbit() {
     console.log("RabbitMQ connected...");
     return channel;
   } catch (error) {
-    console.error("RabbitMQ connection error");
+    logger.error("RabbitMQ connection issue", {
+      error: error.stack,
+    });
+    throw error;
   }
 }
 

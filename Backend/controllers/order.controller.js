@@ -1,3 +1,4 @@
+const logger = require("../utils/errorLogger");
 const db = require("../models");
 const { Customer, Order } = db;
 const { publishToQueue } = require("../services/rabbitmq");
@@ -5,31 +6,20 @@ const { indexOrder, searchOrders } = require("../services/esService");
 const redis = require("../services/redisClient");
 const { sequelize } = require("../models");
 const { errors } = require("@elastic/elasticsearch");
-const Errorlogs = require("../models/errorlogs.model");
 
 exports.createOrder = async (req, res) => {
   try {
     const { customer, items, shipping, extra } = req.body;
 
     if (!customer || typeof customer !== "object") {
-      try {
-        await Errorlogs.create({
-          error: "Customer data is required.",
-        });
-      } catch (error) {
-        console.log("MongoDB error!");
-      }
+      logger.error("Validation failed: customer object missing", {
+        body: req.body,
+      });
       return res.status(400).json({ error: "Customer data is required." });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      try {
-        await Errorlogs.create({
-          error: "Item details are required!",
-        });
-      } catch (error) {
-        console.log("MongoDB error!");
-      }
+      logger.error("Validation failed: items missing", { body: req.body });
       return res.status(400).json({ error: "Item details are required!" });
     }
 
@@ -38,65 +28,82 @@ exports.createOrder = async (req, res) => {
       typeof customer.name !== "string" ||
       customer.name.length > 20
     ) {
-      try {
-        await Errorlogs.create({
-          error: "Invalid customer name!",
-        });
-      } catch (error) {
-        console.log("MongoDB error!");
-      }
+      logger.error("Validation failed: invalid customer name", { customer });
       return res.status(400).json({ error: "Invalid customer name!" });
     }
 
     if (!customer.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) {
-      try {
-        await Errorlogs.create({
-          error: "Invalid email address!",
-        });
-      } catch (error) {
-        console.log("MongoDB error!");
-      }
+      logger.error("Validation failed: invalid email", { customer });
       return res.status(400).json({ error: "Invalid email address!" });
     }
 
     if (!customer.phone || !/^[0-9]{10}$/.test(customer.phone)) {
-      try {
-        await Errorlogs.create({
-          error: "Invalid phone number!",
-        });
-      } catch (error) {
-        console.log("MongoDB error!");
-      }
+      logger.error("Validation failed: invalid phone", { customer });
       return res.status(400).json({ error: "Invalid phone number!" });
     }
 
-    let cust = await Customer.findOne({ where: { email: customer.email } });
+    let cust = await Customer.findOne({
+      where: { email: customer.email },
+    }).catch((err) => {
+      logger.error("DB error: failed to query customer", {
+        error: err.stack,
+        email: customer.email,
+      });
+      return null;
+    });
 
     if (!cust) {
-      cust = await Customer.create({
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
+      try {
+        cust = await Customer.create({
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+        });
+      } catch (err) {
+        logger.error("DB error: failed to create customer", {
+          error: err.stack,
+          customer,
+        });
+        return res.status(500).json({ error: "Customer creation failed!" });
+      }
+    }
+
+    let order;
+    try {
+      order = await Order.create({
+        customerId: cust.id,
+        status: "pending",
+        orderDetails: { items, shipping, extra },
+      });
+    } catch (err) {
+      logger.error("DB error: order creation failed", {
+        error: err.stack,
+        body: req.body,
+      });
+      return res.status(500).json({ error: "Order creation failed!" });
+    }
+
+    try {
+      await publishToQueue("orders_queue", { orderId: order.id });
+    } catch (err) {
+      logger.error("RabbitMQ error: failed to publish order event", {
+        error: err.stack,
+        orderId: order.id,
       });
     }
 
-    const order = await Order.create({
-      customerId: cust.id,
-      status: "pending",
-      orderDetails: { items, shipping, extra },
-    });
-
-    await publishToQueue("orders_queue", { orderId: order.id });
-
     try {
       await indexOrder(order, cust);
-    } catch (error) {
-      console.error("Elasticsearch indexing failed:", error);
+    } catch (err) {
+      logger.error("Elasticsearch error: indexing failed", {
+        error: err.stack,
+        orderId: order.id,
+      });
     }
 
     return res.json({ orderId: order.id, completed: true });
   } catch (error) {
-    console.error("Error while processing order...", error);
+    logger.error("Unhandled exception in createOrder", { error: error.stack });
     return res.status(500).json("Internal Server Error!");
   }
 };
@@ -104,8 +111,12 @@ exports.createOrder = async (req, res) => {
 exports.getOrderById = async (req, res) => {
   const id = req.params.id;
   const cacheKey = `order:${id}`;
+
   try {
-    const cached = await redis.get(cacheKey);
+    const cached = await redis.get(cacheKey).catch((err) => {
+      logger.error("Redis error: get failed", { error: err.stack, cacheKey });
+      return null;
+    });
 
     if (cached) {
       return res.json({ source: "cache", order: JSON.parse(cached) });
@@ -114,26 +125,28 @@ exports.getOrderById = async (req, res) => {
     const order = await Order.findOne({
       where: { id },
       include: [{ model: db.Customer }],
+    }).catch((err) => {
+      logger.error("DB error: fetching order failed", { error: err.stack, id });
+      return null;
     });
 
-    console.log("order value: ", order);
     if (!order) {
-      try {
-        await Errorlogs.create({
-          error: "Order Not Found!",
-        });
-      } catch (error) {
-        return res.status(500).json("MongoDB error!");
-      }
+      logger.error("Order not found", { id });
       return res.status(404).json({ error: "Order Not Found!" });
     }
+
     const result = order.toJSON();
 
-    await redis.set(cacheKey, JSON.stringify(result), { EX: 30 });
+    await redis
+      .set(cacheKey, JSON.stringify(result), { EX: 30 })
+      .catch((err) => {
+        logger.error("Redis error: set failed", { error: err.stack, cacheKey });
+      });
+
     return res.json({ source: "db", order: result });
   } catch (error) {
-    console.error("Error while fetching orders!", error);
-    res.status(500).json({ message: "Internal Server Error!" });
+    logger.error("Unhandled exception in getOrderById", { error: error.stack });
+    return res.status(500).json({ message: "Internal Server Error!" });
   }
 };
 
@@ -141,21 +154,29 @@ exports.orderSearch = async (req, res) => {
   try {
     const { text = "", page = 1, size = 10 } = req.query;
 
-    let status = null;
-    const textLower = text?.trim().toLowerCase() || "";
-
+    const textLower = text.trim().toLowerCase();
     const validStatuses = ["pending", "processing", "completed", "failed"];
-    if (validStatuses.includes(textLower)) {
-      status = textLower;
-    }
+    let status = validStatuses.includes(textLower) ? textLower : null;
+
     const results = await searchOrders(
       { text, status },
       (page - 1) * size,
       Number(size)
-    );
+    ).catch((err) => {
+      logger.error("Elasticsearch error: search failed", {
+        error: err.stack,
+        text,
+      });
+      return null;
+    });
+
+    if (!results || results.length === 0) {
+      return res.status(404).json({ error: "Order Results Found." });
+    }
+
     return res.json({ results });
   } catch (error) {
-    console.error("Error while searching order!", error);
+    logger.error("Unhandled exception in orderSearch", { error: error.stack });
     res.status(500).json({ message: "Internal Server Error!" });
   }
 };
@@ -171,65 +192,58 @@ exports.getOrdersForGrid = async (req, res) => {
       filters = "{}",
     } = req.query;
 
-    const offset = (page - 1) * size;
-    const limit = parseInt(size);
-
     let filterObj = {};
-
     try {
       filterObj = JSON.parse(filters);
-    } catch {}
-
-    let whereFilters = {};
-
-    if (filterObj.status?.filter) {
-      whereFilters.status = filterObj.status.filter;
+    } catch (err) {
+      logger.warn("Invalid filters JSON", { filters });
     }
 
-    if (filterObj.customerId?.filter) {
-      whereFilters.customerId = filterObj.customerId.filter;
-    }
+    const whereFilters = {
+      status: filterObj.status?.filter || "",
+      customerId: filterObj.customerId?.filter || "",
+      shippingMethod: filterObj.shippingMethod?.filter || "",
+      createdAtFrom: filterObj.createdAtCST?.dateFrom || "",
+      createdAtTo: filterObj.createdAtCST?.dateTo || "",
+      itemName: filterObj.items?.filter || "",
+    };
 
-    if (filterObj.shippingMethod?.filter) {
-      whereFilters.shippingMethod = filterObj.shippingMethod.filter;
-    }
+    const offset = (page - 1) * size;
 
-    if (filterObj.createdAtCST?.dateFrom || filterObj.createdAtCST?.dateTo) {
-      whereFilters.createdAtFrom = filterObj.createdAtCST.dateFrom;
-      whereFilters.createdAtTo = filterObj.createdAtCST.dateTo;
-    }
+    const raw = await sequelize
+      .query(
+        `CALL GetOrdersForGrid(:offset, :limit, :sortBy, :sortDir, :status, :customerId, :shippingMethod,
+      :createdAtFrom, :createdAtTo, :itemName)`,
+        {
+          replacements: {
+            offset,
+            limit: Number(size),
+            sortBy,
+            sortDir,
+            ...whereFilters,
+          },
+        }
+      )
+      .catch((err) => {
+        logger.error("DB error: GetOrdersForGrid failed", { error: err.stack });
+        return null;
+      });
 
-    const raw = await sequelize.query(
-      `CALL GetOrdersForGrid(:offset, :limit, :sortBy, :sortDir, :status, :customerId, :shippingMethod,
-      :createdAtFrom, :createdAtTo)`,
-      {
-        replacements: {
-          offset,
-          limit,
-          sortBy,
-          sortDir,
-          status: whereFilters.status || "",
-          customerId: whereFilters.customerId || "",
-          shippingMethod: whereFilters.shippingMethod || "",
-          createdAtFrom: whereFilters.createdAtFrom || "",
-          createdAtTo: whereFilters.createdAtTo || "",
-        },
-      }
-    );
+    if (!raw) {
+      return res.status(500).json({ message: "Database failure" });
+    }
 
     const rows = raw;
-
     const results = rows.map((o) => {
       let details = {};
 
       if (typeof o.orderDetails === "string") {
         try {
           details = JSON.parse(o.orderDetails);
-        } catch {}
-      } else if (
-        typeof o.orderDetails === "object" &&
-        o.orderDetails !== null
-      ) {
+        } catch {
+          logger.warn("Order details JSON parse failed", { orderId: o.id });
+        }
+      } else if (typeof o.orderDetails === "object") {
         details = o.orderDetails;
       }
 
@@ -239,31 +253,36 @@ exports.getOrdersForGrid = async (req, res) => {
         status: o.status,
         createdAtCST: o.createdAtCST,
         updatedAtCST: o.updatedAtCST,
-
         items: details.items || [],
+        itemsText: details.items
+          ? details.items.map((i) => i.name).join(", ")
+          : "",
         itemsCount: details.items ? details.items.length : 0,
-
         shippingMethod: details.shipping?.method || "",
         shippingAddress: details.shipping?.address || "",
         tracking: details.shipping?.tracking || "",
       };
     });
 
-    const countResult = await sequelize.query(
-      `CALL CountOrdersForGrid(:status)`,
-      { replacements: { status } }
-    );
-
-    const total = countResult[0]?.total || 0;
+    const countResult = await sequelize
+      .query(`CALL CountOrdersForGrid(:status)`, { replacements: { status } })
+      .catch((err) => {
+        logger.error("DB error: CountOrdersForGrid failed", {
+          error: err.stack,
+        });
+        return [{ total: 0 }];
+      });
 
     res.json({
       results,
-      total,
+      total: countResult[0]?.total || 0,
       page: Number(page),
-      size: limit,
+      size: Number(size),
     });
   } catch (err) {
-    console.error("Error fetching grid data:", err);
+    logger.error("Unhandled exception in getOrdersForGrid", {
+      error: err.stack,
+    });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -364,7 +383,7 @@ exports.getReport = async (req, res) => {
       statusCounts: rows[0].statusCounts || [],
     });
   } catch (error) {
-    console.error("Error while generating report!", error);
+    logger.error("Unhandled exception in getReport", { error: error.stack });
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

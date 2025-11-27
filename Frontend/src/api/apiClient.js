@@ -23,19 +23,5 @@ export const fetchOrdersForGrid = ({
     params: { page, size, sortBy, sortDir, status },
   });
 
-export const getReport = () => api.get("/orders/report");
+export const fetchOrderReport= () => api.get("/orders/report")
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (!error.response) {
-      return Promise.reject(error);
-    }
-
-    // toast.error(error.response.data.message || "Something went wrong");
-
-    return Promise.reject(error.response.data);
-  }
-);
-
-export default api;

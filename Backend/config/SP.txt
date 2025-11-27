@@ -91,7 +91,7 @@ DELIMITER ;
  DELIMITER $$
 
 CREATE PROCEDURE GetOrdersForGrid(
-    IN p_offset INT,CountOrdersForGridGetOrdersForGridCountOrdersForGrid
+    IN p_offset INT,
     IN p_limit INT,
     IN p_sortBy VARCHAR(255),
     IN p_sortDir VARCHAR(4),
@@ -100,7 +100,9 @@ CREATE PROCEDURE GetOrdersForGrid(
     IN p_customerId VARCHAR(50),
     IN p_shippingMethod VARCHAR(255),
     IN p_createdFrom VARCHAR(50),
-    IN p_createdTo VARCHAR(50)
+    IN p_createdTo VARCHAR(50),
+
+    IN p_itemName VARCHAR(255)
 )
 BEGIN
     SET @sql = CONCAT(
@@ -111,24 +113,44 @@ BEGIN
          FROM Orders WHERE 1=1 '
     );
 
-    IF p_status != '' THEN
+    -- status
+    IF p_status IS NOT NULL AND p_status != '' THEN
         SET @sql = CONCAT(@sql, ' AND status = "', p_status, '" ');
     END IF;
 
-    IF p_customerId != '' THEN
+    -- customer
+    IF p_customerId IS NOT NULL AND p_customerId != '' THEN
         SET @sql = CONCAT(@sql, ' AND customerId = "', p_customerId, '" ');
     END IF;
 
-    IF p_shippingMethod != '' THEN
-        SET @sql = CONCAT(@sql, ' AND JSON_EXTRACT(orderDetails, ''$.shipping.method'') LIKE "%', p_shippingMethod, '%" ');
+    -- shipping method
+    IF p_shippingMethod IS NOT NULL AND p_shippingMethod != '' THEN
+        SET @sql = CONCAT(@sql,
+            ' AND JSON_EXTRACT(orderDetails, ''$.shipping.method'') LIKE "%',
+            p_shippingMethod, '%" ');
     END IF;
 
-    IF p_createdFrom != '' THEN
+    -- created from
+    IF p_createdFrom IS NOT NULL AND p_createdFrom != '' THEN
         SET @sql = CONCAT(@sql, ' AND createdAt >= "', p_createdFrom, '" ');
     END IF;
 
-    IF p_createdTo != '' THEN
+    -- created to
+    IF p_createdTo IS NOT NULL AND p_createdTo != '' THEN
         SET @sql = CONCAT(@sql, ' AND createdAt <= "', p_createdTo, '" ');
+    END IF;
+
+    -- ⭐ SAFE ITEMS FILTER
+    IF p_itemName IS NOT NULL AND p_itemName != '' THEN
+        SET @sql = CONCAT(
+            @sql,
+            ' AND JSON_SEARCH(
+                    IF(JSON_TYPE(JSON_EXTRACT(orderDetails, ''$.items'')) = ''ARRAY'',
+                        JSON_EXTRACT(orderDetails, ''$.items''),
+                        JSON_ARRAY()
+                    ),
+                "all", "%', p_itemName, '%") IS NOT NULL '
+        );
     END IF;
 
     SET @sql = CONCAT(@sql, ' ORDER BY ', p_sortBy, ' ', p_sortDir);
@@ -140,4 +162,3 @@ BEGIN
 END $$
 
 DELIMITER ;
-

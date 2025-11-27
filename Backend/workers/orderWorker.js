@@ -79,7 +79,7 @@ async function orderWorker() {
 
         channel.ack(msg);
       } catch (error) {
-        console.error("Worker error:", error);
+        logger.error("Worker error:", { error: error.stack })
 
         await OrderProcessingLog.create({
           orderId,

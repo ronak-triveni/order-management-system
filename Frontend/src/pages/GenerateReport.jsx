@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Typography,
@@ -10,28 +10,36 @@ import {
   TableBody,
   Divider,
 } from "@mui/material";
-import axios from "axios";
-import { getReport } from "../api/apiClient";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchReport } from "../store/ordersSlice";
+import { toast } from "react-toastify";
 
 export default function ReportsPage() {
-  const [recentTransitions, setRecentTransitions] = useState([]);
-  const [statusCounts, setStatusCounts] = useState([]);
+  const dispatch = useDispatch();
+
+  const { reportData, loading, error } = useSelector((state) => state.orders);
 
   useEffect(() => {
-    getReport()
-      .then((res) => {
-        console.log("res", res);
-        setRecentTransitions(res.data.recentTransitions || []);
-        setStatusCounts(res.data.statusCounts || []);
-      })
-      .catch((err) => console.error("Report Fetch Error", err));
-  }, []);
+    dispatch(fetchReport());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
+  const recentTransitions = reportData?.recentTransitions || [];
+  const statusCounts = reportData?.statusCounts || [];
 
   return (
     <Box p={3}>
       <Typography variant="h4" mb={3}>
         Order Reports
       </Typography>
+
+      {loading && <Typography>Loading...</Typography>}
+
       {/*Status Count + Item Breakdown */}
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h5">Order Status Counts</Typography>
@@ -61,6 +69,7 @@ export default function ReportsPage() {
       <Paper elevation={3} sx={{ p: 0, mb: 2 }}>
         <Typography variant="h5">Recent Status Transitions</Typography>
         <Divider sx={{ my: 2 }} />
+
         <Box sx={{ overflowX: "auto" }}>
           <Table>
             <TableHead>

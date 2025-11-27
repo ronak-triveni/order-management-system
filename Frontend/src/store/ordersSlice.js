@@ -53,6 +53,19 @@ export const fetchOrdersGrid = createAsyncThunk(
   }
 );
 
+export const fetchReport = createAsyncThunk(
+  "orders/getReport",
+  async (params, thunkAPI) => {
+    try {
+      const res = await api.fetchOrderReport(params);
+      return res.data;
+    } catch (error) {
+      console.log(error);
+      return handleApiError(error, thunkAPI);
+    }
+  }
+);
+
 const ordersSlice = createSlice({
   name: "orders",
   initialState: {
@@ -64,6 +77,7 @@ const ordersSlice = createSlice({
     gridError: null,
     loading: false,
     error: null,
+    reportData: null,
   },
   reducers: {
     clearCreateResult(state) {
@@ -77,6 +91,9 @@ const ordersSlice = createSlice({
     },
     clearError(state) {
       state.error = null;
+    },
+    clearReportResults(state) {
+      state.reportData = null;
     },
   },
   extraReducers: (builder) => {
@@ -129,6 +146,19 @@ const ordersSlice = createSlice({
         state.gridData = action.payload;
       })
       .addCase(fetchOrdersGrid.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.error || "Unexpected server error";
+      })
+
+      .addCase(fetchReport.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchReport.fulfilled, (state, action) => {
+        state.loading = false;
+        state.reportData = action.payload;
+      })
+      .addCase(fetchReport.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.error || "Unexpected server error";
       });

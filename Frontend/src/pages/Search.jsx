@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { searchOrders } from "../store/ordersSlice";
 import Paper from "@mui/material/Paper";
@@ -9,13 +9,25 @@ import ListItem from "@mui/material/ListItem";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
+import { toast } from "react-toastify";
 
 export default function Search() {
   const [input, setInput] = useState("");
   const dispatch = useDispatch();
-  const { searchResults, loading } = useSelector((s) => s.orders);
+
+  const { searchResults, loading, error } = useSelector((s) => s.orders);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   const doSearch = () => {
+    if (!input.trim()) {
+      toast.warning("Enter search text before searching");
+      return;
+    }
     dispatch(searchOrders({ input, page: 1, size: 20 }));
   };
 
@@ -50,12 +62,10 @@ export default function Search() {
               const source = r._source || r;
 
               const orderId = source.orderId || r._id;
-
               const customer = {
                 name: source.customerName || "N/A",
               };
 
-              // Items directly from ES hits
               const items = source.items || [];
 
               return (

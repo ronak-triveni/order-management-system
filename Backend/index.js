@@ -39,7 +39,7 @@ async function ensureElasticIfRequired() {
     await esClient.ping();
     console.log("ElasticSearch connected...");
   } catch (err) {
-    console.error("ElasticSearch ping failed:", err);
+    logger.error("ElasticSearch ping failed", { error: err.stack })
     process.exit(1);
   }
 }
@@ -56,6 +56,6 @@ db.sequelize
     });
   })
   .catch((err) => {
-    console.error("Database connection failed:", err.message);
+    logger.error("Database connection failed", { error: err.stack })
     process.exit(1);
   });

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AgGridReact } from "ag-grid-react";
+import { toast } from "react-toastify";
 
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
@@ -55,7 +56,7 @@ export default function OrdersGrid() {
     },
 
     {
-      field: "items",
+      field: "itemsText",
       headerName: "Items",
       flex: 1,
       width: 150,
@@ -63,7 +64,7 @@ export default function OrdersGrid() {
       cellRenderer: (params) => {
         return (
           <div style={{ whiteSpace: "pre-line", lineHeight: "18px" }}>
-            {formatItems(params.value)}
+            {formatItems(params.data.items)}
           </div>
         );
       },

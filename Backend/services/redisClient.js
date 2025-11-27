@@ -6,11 +6,11 @@ const client = redis.createClient({
   legacyMode: false,
 });
 
-client.on("error", (err) => console.error("Redis Error", err));
+client.on("error", (err) => logger.error("Redis error", { error: err.stack }));
 
 client
   .connect()
   .then(() => console.log("Redis connected"))
-  .catch((err) => console.error("Redis connection failed", err));
+  .catch((err) => logger.error("Redis connection failed", { error: err.stack }));
 
 module.exports = client;
